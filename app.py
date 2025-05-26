@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, make_response
 import yt_dlp
 import uuid
 import os
@@ -21,13 +21,21 @@ def convert():
             "format": "best[ext=mp4]/best",
             "quiet": True,
             "no_warnings": True,
+            "noplaylist": True,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0",
+                "Referer": "https://www.amazon.es/"
+            }
         }
 
         try:
+            print(f"Descargando: {url}")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
+            print(f"Archivo generado: {filename}")
             output_files.append(filename)
         except Exception as e:
+            print(f"Error con {url}: {str(e)}")
             return jsonify({"error": str(e)}), 500
 
     return jsonify({"files": output_files})
@@ -36,7 +44,9 @@ def convert():
 def download(filename):
     filepath = os.path.join(DOWNLOAD_FOLDER, filename)
     if os.path.exists(filepath):
-        return send_file(filepath, as_attachment=True)
+        response = make_response(send_file(filepath, mimetype="video/mp4"))
+        response.headers["Content-Disposition"] = "inline"
+        return response
     return jsonify({"error": "File not found"}), 404
 
 if __name__ == "__main__":
